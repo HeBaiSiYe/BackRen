@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.aynu.siyemanager.mapper.PersonMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.edu.aynu.siyemanager.entity.Person">
+        <id column="id" property="id"/>
+        <result column="id_card" property="idCard"/>
+        <result column="name" property="name"/>
+        <result column="gender" property="gender"/>
+        <result column="nation" property="nation"/>
+        <result column="birthday" property="birthday"/>
+        <result column="household_id" property="householdId"/>
+        <result column="relation" property="relation"/>
+        <result column="person_type" property="personType"/>
+        <result column="register_province" property="registerProvince"/>
+        <result column="register_city" property="registerCity"/>
+        <result column="register_district" property="registerDistrict"/>
+        <result column="register_detail" property="registerDetail"/>
+        <result column="current_province" property="currentProvince"/>
+        <result column="current_city" property="currentCity"/>
+        <result column="current_district" property="currentDistrict"/>
+        <result column="current_detail" property="currentDetail"/>
+        <result column="phone" property="phone"/>
+        <result column="person_status" property="personStatus"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 人员详情结果映射 -->
+    <resultMap id="PersonDetailVOResultMap" type="cn.edu.aynu.siyemanager.vo.PersonDetailVO">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="id_card" property="idCard"/>
+        <result column="gender" property="gender"/>
+        <result column="birthday" property="birthday"/>
+        <result column="phone" property="phone"/>
+        <result column="person_type" property="personType"/>
+        <result column="household_id" property="householdId"/>
+        <result column="household_no" property="householdNo"/>
+        <result column="relation" property="relation"/>
+    </resultMap>
+
+    <!-- 根据姓名和身份证号查询人员信息 -->
+    <select id="selectByNameAndIdCard" resultMap="PersonDetailVOResultMap">
+        SELECT
+            p.id,
+            p.name,
+            p.id_card,
+            p.gender,
+            p.birthday,
+            p.phone,
+            p.person_type,
+            p.household_id,
+            h.household_no,
+            p.relation
+        FROM person p
+                 LEFT JOIN household h ON p.household_id = h.id
+        WHERE p.name = #{name}
+          AND p.id_card = #{idCard}
+    </select>
+
+    <!-- 新增人员 -->
+    <insert id="insert" parameterType="cn.edu.aynu.siyemanager.entity.Person"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO person (
+        id_card, name, gender, nation, birthday,
+        household_id, relation, person_type,
+        register_province, register_city, register_district, register_detail,
+        current_province, current_city, current_district, current_detail,
+        phone, person_status, create_time
+        ) VALUES (
+        #{idCard}, #{name}, #{gender}, #{nation}, #{birthday},
+        #{householdId}, #{relation}, #{personType},
+        #{registerProvince}, #{registerCity}, #{registerDistrict}, #{registerDetail},
+        #{currentProvince}, #{currentCity}, #{currentDistrict}, #{currentDetail},
+        #{phone}, #{personStatus},
+        <choose>
+            <when test="createTime != null">#{createTime}</when>
+            <otherwise>NOW()</otherwise>
+        </choose>
+        )
+    </insert>
+
+    <!-- 根据户ID查询家庭成员 -->
+    <select id="selectMembersByHouseholdId" resultMap="HouseholdMemberVOResultMap">
+        SELECT
+            id,
+            name,
+            id_card,
+            gender,
+            birthday,
+            relation,
+            person_type,
+            phone
+        FROM person
+        WHERE household_id = #{householdId}
+        ORDER BY
+            CASE relation
+                WHEN '户主' THEN 1
+                WHEN '配偶' THEN 2
+                WHEN '子女' THEN 3
+                WHEN '父母' THEN 4
+                ELSE 5
+                END,
+            create_time
+    </select>
+
+    <!-- 家庭成员结果映射 -->
+    <resultMap id="HouseholdMemberVOResultMap" type="cn.edu.aynu.siyemanager.vo.HouseholdMemberVO">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="id_card" property="idCard"/>
+        <result column="gender" property="gender"/>
+        <result column="birthday" property="birthday"/>
+        <result column="relation" property="relation"/>
+        <result column="person_type" property="personType"/>
+        <result column="phone" property="phone"/>
+    </resultMap>
+
+    <!-- 更新人员 -->
+    <update id="update" parameterType="cn.edu.aynu.siyemanager.entity.Person">
+        UPDATE person
+        <set>
+            <if test="idCard != null">id_card = #{idCard},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="gender != null">gender = #{gender},</if>
+            <if test="nation != null">nation = #{nation},</if>
+            <if test="birthday != null">birthday = #{birthday},</if>
+            <if test="householdId != null or householdId == ''">household_id = #{householdId},</if>
+            <if test="relation != null or relation == ''">relation = #{relation},</if>
+            <if test="personType != null">person_type = #{personType},</if>
+            <if test="registerProvince != null or registerProvince == ''">register_province = #{registerProvince},</if>
+            <if test="registerCity != null or registerCity == ''">register_city = #{registerCity},</if>
+            <if test="registerDistrict != null or registerDistrict == ''">register_district = #{registerDistrict},</if>
+            <if test="registerDetail != null or registerDetail == ''">register_detail = #{registerDetail},</if>
+            <if test="currentProvince != null">current_province = #{currentProvince},</if>
+            <if test="currentCity != null">current_city = #{currentCity},</if>
+            <if test="currentDistrict != null">current_district = #{currentDistrict},</if>
+            <if test="currentDetail != null">current_detail = #{currentDetail},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="personStatus != null">person_status = #{personStatus},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除人员 -->
+    <delete id="deleteById">
+        DELETE FROM person WHERE id = #{id}
+    </delete>
+
+    <!-- PersonListVO结果映射（新增） -->
+    <resultMap id="PersonListVOResultMap" type="cn.edu.aynu.siyemanager.vo.PersonListVO">
+        <id column="id" property="id"/>
+        <result column="id_card" property="idCard"/>
+        <result column="name" property="name"/>
+        <result column="gender" property="gender"/>
+        <result column="nation" property="nation"/>
+        <result column="birthday" property="birthday"/>
+        <result column="household_id" property="householdId"/>
+        <result column="relation" property="relation"/>
+        <result column="person_type" property="personType"/>
+        <result column="register_province" property="registerProvince"/>
+        <result column="register_city" property="registerCity"/>
+        <result column="register_district" property="registerDistrict"/>
+        <result column="register_detail" property="registerDetail"/>
+        <result column="current_province" property="currentProvince"/>
+        <result column="current_city" property="currentCity"/>
+        <result column="current_district" property="currentDistrict"/>
+        <result column="current_detail" property="currentDetail"/>
+        <result column="phone" property="phone"/>
+        <result column="person_status" property="personStatus"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 修改分页查询的SQL -->
+    <select id="selectPersonList" resultMap="PersonListVOResultMap">
+        SELECT
+        p.id,
+        p.id_card,
+        p.name,
+        p.gender,
+        p.nation,
+        p.birthday,
+        p.household_id,
+        p.relation,
+        p.person_type,
+
+        <!-- 从户籍表查询户籍地址 -->
+        h.province as register_province,
+        h.city as register_city,
+        h.district as register_district,
+        h.detail_address as register_detail,
+
+        <!-- 现住地址仍用人员自己的字段 -->
+        p.current_province,
+        p.current_city,
+        p.current_district,
+        p.current_detail,
+
+        p.phone,
+        p.person_status,
+        p.create_time
+        FROM person p
+        LEFT JOIN household h ON p.household_id = h.id
+        <where>
+            <if test="query.name != null and query.name != ''">
+                AND p.name LIKE CONCAT('%', #{query.name}, '%')
+            </if>
+            <if test="query.idCard != null and query.idCard != ''">
+                AND p.id_card LIKE CONCAT('%', #{query.idCard}, '%')
+            </if>
+            <if test="query.personType != null">
+                AND p.person_type = #{query.personType}
+            </if>
+            <if test="query.personStatus != null">
+                AND p.person_status = #{query.personStatus}
+            </if>
+            <if test="query.householdId != null">
+                AND p.household_id = #{query.householdId}
+            </if>
+        </where>
+        ORDER BY p.create_time DESC
+        <!-- 添加分页条件 -->
+        <if test="offset != null and pageSize != null">
+            LIMIT #{offset}, #{pageSize}
+        </if>
+    </select>
+
+    <!-- 查询人员总数（新增） -->
+    <!-- 修改countPersonList SQL -->
+    <select id="countPersonList" resultType="long">
+        SELECT COUNT(*)
+        FROM person p
+        <where>
+            <if test="name != null and name != ''">
+                AND p.name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="idCard != null and idCard != ''">
+                AND p.id_card LIKE CONCAT('%', #{idCard}, '%')
+            </if>
+            <if test="personType != null">
+                AND p.person_type = #{personType}
+            </if>
+            <if test="personStatus != null">
+                AND p.person_status = #{personStatus}
+            </if>
+            <if test="householdId != null">
+                AND p.household_id = #{householdId}
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据户ID查询家庭成员列表（新增） -->
+    <select id="selectPersonByHouseholdId" resultMap="PersonListVOResultMap">
+        SELECT
+            id,
+            id_card,
+            name,
+            gender,
+            nation,
+            birthday,
+            household_id,
+            relation,
+            person_type,
+            register_province,
+            register_city,
+            register_district,
+            register_detail,
+            current_province,
+            current_city,
+            current_district,
+            current_detail,
+            phone,
+            person_status,
+            create_time
+        FROM person
+        WHERE household_id = #{householdId}
+        ORDER BY
+            CASE relation
+                WHEN '户主' THEN 1
+                WHEN '配偶' THEN 2
+                WHEN '子女' THEN 3
+                WHEN '父母' THEN 4
+                ELSE 5
+                END,
+            create_time
+    </select>
+
+    <!-- 根据户ID查询户籍下的所有人员 -->
+    <select id="selectByHouseholdId" resultMap="BaseResultMap">
+        SELECT
+            id,
+            id_card,
+            name,
+            gender,
+            nation,
+            birthday,
+            household_id,
+            relation,
+            person_type,
+            register_province,
+            register_city,
+            register_district,
+            register_detail,
+            current_province,
+            current_city,
+            current_district,
+            current_detail,
+            phone,
+            person_status,
+            create_time
+        FROM person
+        WHERE household_id = #{householdId}
+    </select>
+
+
+
+</mapper>

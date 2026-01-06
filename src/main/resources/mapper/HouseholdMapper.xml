@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.aynu.siyemanager.mapper.HouseholdMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="cn.edu.aynu.siyemanager.entity.Household">
+        <id column="id" property="id"/>
+        <result column="household_no" property="householdNo"/>
+        <result column="area_code" property="areaCode"/>
+        <result column="province" property="province"/>
+        <result column="city" property="city"/>
+        <result column="district" property="district"/>
+        <result column="detail_address" property="detailAddress"/>
+        <result column="head_person_id" property="headPersonId"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 列表查询结果映射 -->
+    <resultMap id="HouseholdListVOResultMap" type="cn.edu.aynu.siyemanager.vo.HouseholdListVO">
+        <id column="id" property="id"/>
+        <result column="household_no" property="householdNo"/>
+        <result column="head_name" property="headName"/>
+        <result column="head_id_card" property="headIdCard"/>
+        <result column="province" property="province"/>
+        <result column="city" property="city"/>
+        <result column="district" property="district"/>
+        <result column="detail_address" property="detailAddress"/>
+        <result column="member_count" property="memberCount"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 查询户籍列表 -->
+    <select id="selectHouseholdList" resultMap="HouseholdListVOResultMap">
+        SELECT
+        h.id,
+        h.household_no,
+        p.name as head_name,
+        p.id_card as head_id_card,
+        h.province,
+        h.city,
+        h.district,
+        h.detail_address,
+        (SELECT COUNT(*) FROM person p2 WHERE p2.household_id = h.id) as member_count,
+        h.status,
+        h.create_time
+        FROM household h
+        LEFT JOIN person p ON h.head_person_id = p.id
+        <where>
+            <if test="query.householdNo != null and query.householdNo != ''">
+                AND h.household_no LIKE CONCAT('%', #{query.householdNo}, '%')
+            </if>
+            <if test="query.headName != null and query.headName != ''">
+                AND p.name LIKE CONCAT('%', #{query.headName}, '%')
+            </if>
+            <if test="query.province != null and query.province != ''">
+                AND h.province = #{query.province}
+            </if>
+            <if test="query.city != null and query.city != ''">
+                AND h.city = #{query.city}
+            </if>
+            <if test="query.district != null and query.district != ''">
+                AND h.district = #{query.district}
+            </if>
+            <if test="query.status != null">
+                AND h.status = #{query.status}
+            </if>
+        </where>
+        ORDER BY h.create_time DESC
+        <if test="query.page != null and query.pageSize != null">
+            LIMIT #{query.pageSize} OFFSET #{query.offset}
+        </if>
+    </select>
+
+    <!-- 查询户籍总数 -->
+    <select id="countHouseholdList" resultType="long">
+        SELECT COUNT(*)
+        FROM household h
+        LEFT JOIN person p ON h.head_person_id = p.id
+        <where>
+            <if test="query.householdNo != null and query.householdNo != ''">
+                AND h.household_no LIKE CONCAT('%', #{query.householdNo}, '%')
+            </if>
+            <if test="query.headName != null and query.headName != ''">
+                AND p.name LIKE CONCAT('%', #{query.headName}, '%')
+            </if>
+            <if test="query.province != null and query.province != ''">
+                AND h.province = #{query.province}
+            </if>
+            <if test="query.city != null and query.city != ''">
+                AND h.city = #{query.city}
+            </if>
+            <if test="query.district != null and query.district != ''">
+                AND h.district = #{query.district}
+            </if>
+            <if test="query.status != null">
+                AND h.status = #{query.status}
+            </if>
+        </where>
+    </select>
+
+    <!-- 根据ID查询户籍 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+            id, household_no, area_code, province, city, district,
+            detail_address, head_person_id, status, create_time
+        FROM household
+        WHERE id = #{id}
+    </select>
+
+    <!-- 新增户籍 -->
+    <insert id="insert" parameterType="cn.edu.aynu.siyemanager.entity.Household"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO household (
+        household_no, area_code, province, city, district,
+        detail_address, head_person_id, status, create_time
+        ) VALUES (
+        #{householdNo}, #{areaCode}, #{province}, #{city}, #{district},
+        #{detailAddress}, #{headPersonId}, #{status},
+        <choose>
+            <when test="createTime != null">#{createTime}</when>
+            <otherwise>NOW()</otherwise>
+        </choose>
+        )
+    </insert>
+
+    <!-- 更新户籍 -->
+    <update id="update" parameterType="cn.edu.aynu.siyemanager.entity.Household">
+        UPDATE household
+        <set>
+            <if test="householdNo != null">household_no = #{householdNo},</if>
+            <if test="areaCode != null">area_code = #{areaCode},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="district != null">district = #{district},</if>
+            <if test="detailAddress != null">detail_address = #{detailAddress},</if>
+            <if test="headPersonId != null">head_person_id = #{headPersonId},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID查询户籍详情 -->
+    <select id="selectDetailById" resultMap="HouseholdDetailVOResultMap">
+        SELECT
+            h.id,
+            h.household_no,
+            h.area_code,
+            h.province,
+            h.city,
+            h.district,
+            h.detail_address,
+            h.head_person_id,
+            h.status,
+            h.create_time,
+            p.name as head_name,
+            p.id_card as head_id_card
+        FROM household h
+                 LEFT JOIN person p ON h.head_person_id = p.id
+        WHERE h.id = #{id}
+    </select>
+
+    <!-- 户籍详情结果映射 -->
+    <resultMap id="HouseholdDetailVOResultMap" type="cn.edu.aynu.siyemanager.vo.HouseholdDetailVO">
+        <id column="id" property="id"/>
+        <result column="household_no" property="householdNo"/>
+        <result column="area_code" property="areaCode"/>
+        <result column="province" property="province"/>
+        <result column="city" property="city"/>
+        <result column="district" property="district"/>
+        <result column="detail_address" property="detailAddress"/>
+        <result column="head_person_id" property="headPersonId"/>
+        <result column="head_name" property="headName"/>
+        <result column="head_id_card" property="headIdCard"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 根据户号查询（排除指定ID） -->
+    <select id="selectByHouseholdNoExcludeId" resultMap="BaseResultMap">
+        SELECT
+            id, household_no, area_code, province, city, district,
+            detail_address, head_person_id, status, create_time, update_time
+        FROM household
+        WHERE household_no = #{householdNo}
+          AND id != #{excludeId}
+    </select>
+    <!-- 或者可以自定义查询（如果需要关联查询） -->
+    <select id="selectByHouseholdNo" resultType="cn.edu.aynu.siyemanager.entity.Household">
+        SELECT
+            h.*,
+            p.name as headName,
+            p.id_card as headIdCard
+        FROM household h
+                 LEFT JOIN person p ON h.head_person_id = p.id
+        WHERE h.household_no = #{householdNo}
+          AND h.status = 1
+    </select>
+
+    <!-- 删除户籍 -->
+    <delete id="deleteById">
+        DELETE FROM household WHERE id = #{id}
+    </delete>
+
+
+
+</mapper>

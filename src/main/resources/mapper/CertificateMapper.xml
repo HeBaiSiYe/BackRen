@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.edu.aynu.siyemanager.mapper.CertificateMapper">
+
+    <resultMap id="CertificateListVOResultMap" type="cn.edu.aynu.siyemanager.vo.CertificateListVO">
+        <id column="id" property="id"/>
+        <result column="person_id" property="personId"/>
+        <result column="person_name" property="personName"/>
+        <result column="type" property="type"/>
+        <result column="number" property="number"/>
+        <result column="issue_date" property="issueDate"/>
+        <result column="expire_date" property="expireDate"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 分页查询证件列表 -->
+    <select id="selectCertificateList" resultMap="CertificateListVOResultMap">
+        SELECT
+        c.id,
+        c.person_id,
+        p.name as person_name,
+        c.type,
+        c.number,
+        c.issue_date,
+        c.expire_date,
+        c.status,
+        c.create_time
+        FROM certificate c
+        LEFT JOIN person p ON c.person_id = p.id
+        <where>
+            <if test="query.type != null">
+                AND c.type = #{query.type}
+            </if>
+            <if test="query.status != null">
+                AND c.status = #{query.status}
+            </if>
+            <if test="query.personId != null">
+                AND c.person_id = #{query.personId}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (p.name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR c.number LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY c.create_time DESC
+        <if test="query.page != null and query.pageSize != null">
+            LIMIT #{query.offset}, #{query.pageSize}
+        </if>
+    </select>
+
+    <!-- 查询证件总数 -->
+    <select id="countCertificateList" resultType="long">
+        SELECT COUNT(*)
+        FROM certificate c
+        LEFT JOIN person p ON c.person_id = p.id
+        <where>
+            <if test="query.type != null">
+                AND c.type = #{query.type}
+            </if>
+            <if test="query.status != null">
+                AND c.status = #{query.status}
+            </if>
+            <if test="query.personId != null">
+                AND c.person_id = #{query.personId}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (p.name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR c.number LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+    </select>
+
+    <!-- 在CertificateMapper.xml中添加 -->
+    <insert id="insert" parameterType="cn.edu.aynu.siyemanager.entity.Certificate"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO certificate (
+            person_id,
+            type,
+            number,
+            issue_date,
+            expire_date,
+            status,
+            create_time
+        ) VALUES (
+                     #{personId},
+                     #{type},
+                     #{number},
+                     #{issueDate},
+                     #{expireDate},
+                     #{status},
+                     #{createTime}
+                 )
+    </insert>
+</mapper>
