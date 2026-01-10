@@ -27,6 +27,46 @@ public class PersonServiceImpl implements PersonService {
     @Autowired
     private HouseholdMapper householdMapper;
 
+    /**
+     * 判断人员的人口类型
+     */
+    private Integer determinePersonType(Long householdId, String registerAddress, String currentAddress) {
+        if (householdId == null) {
+            return 2; // 流动人口
+        }
+
+        if ((registerAddress == null || registerAddress.isEmpty()) &&
+                (currentAddress == null || currentAddress.isEmpty())) {
+            return 1; // 户籍地人口
+        }
+
+        if (registerAddress != null && currentAddress != null) {
+            return registerAddress.equals(currentAddress) ? 1 : 2;
+        }
+
+        return 1; // 默认户籍地人口
+    }
+
+    /**
+     * 构建完整地址字符串
+     */
+    private String buildAddress(String province, String city, String district, String detail) {
+        StringBuilder address = new StringBuilder();
+        if (province != null && !province.isEmpty()) {
+            address.append(province);
+        }
+        if (city != null && !city.isEmpty()) {
+            address.append(city);
+        }
+        if (district != null && !district.isEmpty()) {
+            address.append(district);
+        }
+        if (detail != null && !detail.isEmpty()) {
+            address.append(detail);
+        }
+        return address.toString();
+    }
+
     @Override
     public PersonDetailVO searchPerson(PersonSearchDTO searchDTO) {
         // 根据姓名和身份证号查询
@@ -69,10 +109,41 @@ public class PersonServiceImpl implements PersonService {
 
     @Override
     @Transactional
-    public boolean updatePerson(Person person) {
-        Person existing = personMapper.selectById(person.getId());
-        if (existing == null) {
+    public boolean updatePerson(Person person) {  // 参数名是 person
+        // ✅ 修正：重命名局部变量，避免与参数名冲突
+        Person existingPerson = personMapper.selectById(person.getId());
+        if (existingPerson == null) {
             return false;
+        }
+
+        // 如果人员不是重点人口（3），自动计算人口类型
+        Integer newPersonType = person.getPersonType();
+        if (newPersonType == null || newPersonType != 3) {
+            // 获取户籍地址
+            String registerAddress = null;
+            if (person.getHouseholdId() != null) {
+                Household household = householdMapper.selectById(person.getHouseholdId());
+                if (household != null) {
+                    registerAddress = buildAddress(
+                            household.getProvince(),
+                            household.getCity(),
+                            household.getDistrict(),
+                            household.getDetailAddress()
+                    );
+                }
+            }
+
+            // 构建现住地址
+            String currentAddress = buildAddress(
+                    person.getCurrentProvince(),
+                    person.getCurrentCity(),
+                    person.getCurrentDistrict(),
+                    person.getCurrentDetail()
+            );
+
+            // 自动判断人口类型
+            newPersonType = determinePersonType(person.getHouseholdId(), registerAddress, currentAddress);
+            person.setPersonType(newPersonType);
         }
 
         int result = personMapper.update(person);
@@ -119,14 +190,15 @@ public class PersonServiceImpl implements PersonService {
     @Override
     @Transactional
     public PersonAddVO addPerson(PersonAddDTO addDTO) {
-
-        // 2. 如果指定了户籍，校验户籍是否存在
+        // 1. 如果指定了户籍，校验户籍是否存在
         Household household = null;
         if (addDTO.getHouseholdId() != null) {
-            household = householdMapper.selectById(addDTO.getHouseholdId());
-            if (household == null) {
+            // ✅ 修正：使用不同的变量名，避免与下面的变量冲突
+            Household targetHousehold = householdMapper.selectById(addDTO.getHouseholdId());
+            if (targetHousehold == null) {
                 throw new RuntimeException("所属户籍不存在");
             }
+            household = targetHousehold;  // 赋值给方法级变量
 
             // 如果指定了户籍但没有指定关系，设置默认关系
             if (addDTO.getRelation() == null) {
@@ -140,20 +212,45 @@ public class PersonServiceImpl implements PersonService {
             }
         }
 
-        // 3. 创建人员对象
+        // 2. 创建人员对象
         Person person = new Person();
         BeanUtils.copyProperties(addDTO, person);
 
-        // 4. 处理户籍地址和现住地址逻辑
+        // 3. 处理户籍地址和现住地址逻辑
         handleAddressInfo(person, household, addDTO);
 
-        // 5. 设置其他默认值
+        // 4. 设置其他默认值
         if (person.getPersonStatus() == null) {
             person.setPersonStatus(1); // 默认正常状态
         }
-        if (person.getPersonType() == null) {
-            person.setPersonType(1); // 默认户籍地人口
+
+        // 5. 如果不是重点人口，自动判断人口类型
+        if (person.getPersonType() == null || person.getPersonType() != 3) {
+            String registerAddress = null;
+            if (household != null) {
+                registerAddress = buildAddress(
+                        household.getProvince(),
+                        household.getCity(),
+                        household.getDistrict(),
+                        household.getDetailAddress()
+                );
+            }
+
+            String currentAddress = buildAddress(
+                    addDTO.getCurrentProvince(),
+                    addDTO.getCurrentCity(),
+                    addDTO.getCurrentDistrict(),
+                    addDTO.getCurrentDetail()
+            );
+
+            Integer newPersonType = determinePersonType(
+                    addDTO.getHouseholdId(),
+                    registerAddress,
+                    currentAddress
+            );
+            person.setPersonType(newPersonType);
         }
+
         person.setCreateTime(LocalDateTime.now());
 
         // 6. 插入数据

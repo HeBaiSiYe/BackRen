@@ -25,6 +25,46 @@ public class HouseholdServiceImpl implements HouseholdService {
     @Autowired
     private PersonMapper personMapper;
 
+    /**
+     * 构建完整地址字符串
+     */
+    private String buildAddress(String province, String city, String district, String detail) {
+        StringBuilder address = new StringBuilder();
+        if (province != null && !province.isEmpty()) {
+            address.append(province);
+        }
+        if (city != null && !city.isEmpty()) {
+            address.append(city);
+        }
+        if (district != null && !district.isEmpty()) {
+            address.append(district);
+        }
+        if (detail != null && !detail.isEmpty()) {
+            address.append(detail);
+        }
+        return address.toString();
+    }
+
+    /**
+     * 判断人员的人口类型（复制PersonServiceImpl中的逻辑）
+     */
+    private Integer determinePersonType(Long householdId, String registerAddress, String currentAddress) {
+        if (householdId == null) {
+            return 2; // 流动人口
+        }
+
+        if ((registerAddress == null || registerAddress.isEmpty()) &&
+                (currentAddress == null || currentAddress.isEmpty())) {
+            return 1; // 户籍地人口
+        }
+
+        if (registerAddress != null && currentAddress != null) {
+            return registerAddress.equals(currentAddress) ? 1 : 2;
+        }
+
+        return 1;
+    }
+
     @Override
     @Transactional
     public HouseholdAddVO addHousehold(HouseholdAddDTO addDTO) {
@@ -158,51 +198,59 @@ public class HouseholdServiceImpl implements HouseholdService {
         return householdMapper.selectById(id);
     }
 
+    @Override
     @Transactional
     public boolean updateHousehold(Household household) {
-        // 1. 检查户籍是否存在
         Household existing = householdMapper.selectById(household.getId());
         if (existing == null) {
-            return false; // 户籍不存在
+            return false;
         }
 
-        // 2. 如果更新了地址信息，需要同步更新户主的户籍地址
-        boolean addressChanged = isAddressChanged(existing, household);
-        if (addressChanged && existing.getHeadPersonId() != null) {
-            // 获取户主信息
-            Person headPerson = personMapper.selectById(existing.getHeadPersonId());
-            if (headPerson != null) {
-                // 创建更新人员的对象
-                Person updatePerson = new Person();
-                updatePerson.setId(existing.getHeadPersonId());
+        int result = householdMapper.update(household);
+        if (result > 0) {
+            // 更新该户籍下所有非重点人口的人员类型
+            updateHouseholdMembersPersonType(household.getId());
+        }
+        return result > 0;
+    }
 
-                // 更新户籍地址
-                if (household.getProvince() != null) {
-                    updatePerson.setRegisterProvince(household.getProvince());
-                    // 如果需要，也可以更新现住地址
-                    // updatePerson.setCurrentProvince(household.getProvince());
-                }
-                if (household.getCity() != null) {
-                    updatePerson.setRegisterCity(household.getCity());
-                    // updatePerson.setCurrentCity(household.getCity());
-                }
-                if (household.getDistrict() != null) {
-                    updatePerson.setRegisterDistrict(household.getDistrict());
-                    // updatePerson.setCurrentDistrict(household.getDistrict());
-                }
-                if (household.getDetailAddress() != null) {
-                    updatePerson.setRegisterDetail(household.getDetailAddress());
-                    // updatePerson.setCurrentDetail(household.getDetailAddress());
-                }
+    /**
+     * 更新户籍下所有非重点人口的人员类型
+     */
+    private void updateHouseholdMembersPersonType(Long householdId) {
+        // 获取该户籍下的所有人员
+        List<Person> members = personMapper.selectByHouseholdId(householdId);
+        if (members == null || members.isEmpty()) {
+            return;
+        }
 
-                // 执行更新
-                personMapper.update(updatePerson);
+        Household household = householdMapper.selectById(householdId);
+        if (household == null) return;
+
+        String householdAddress = buildAddress(household.getProvince(), household.getCity(),
+                household.getDistrict(), household.getDetailAddress());
+
+        for (Person person : members) {
+            // 只更新非重点人口（personType != 3）
+            if (person.getPersonType() != 3) {
+                // 构建现住地址
+                String currentAddress = buildAddress(
+                        person.getCurrentProvince(),
+                        person.getCurrentCity(),
+                        person.getCurrentDistrict(),
+                        person.getCurrentDetail()
+                );
+
+                // 判断人口类型
+                Integer newPersonType = determinePersonType(householdId, householdAddress, currentAddress);
+
+                // 如果需要更新
+                if (!newPersonType.equals(person.getPersonType())) {
+                    person.setPersonType(newPersonType);
+                    personMapper.update(person);
+                }
             }
         }
-
-        // 3. 更新户籍数据
-        int result = householdMapper.update(household);
-        return result > 0;
     }
 
     /**
